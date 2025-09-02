@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Self Checkout - Pagamento com Maquineta</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+    main {
+      background: rgba(255 255 255 / 0.95);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      max-width: 420px;
+      width: 100%;
+      padding: 2rem;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 400px;
+      position: relative;
+    }
+    h1, h2 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+    }
+    label {
+      font-weight: 600;
+      color: #34495e;
+    }
+    input[type="number"] {
+      border: 1.5px solid #bdc3c7;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      width: 100%;
+      transition: border-color 0.3s ease;
+    }
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+    }
+    input[type="number"].invalid {
+      border-color: #e53e3e;
+    }
+    button {
+      background-color: #4f46e5;
+      color: white;
+      font-weight: 700;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      width: 100%;
+      font-size: 1.125rem;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    button:disabled {
+      background-color: #a5b4fc;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background-color: #4338ca;
+    }
+    #comprovante {
+      margin-top: 2rem;
+      background-color: #f3f4f6;
+      border: 2px dashed #9ca3af;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      color: #1f2937;
+      box-sizing: border-box;
+      user-select: text;
+      min-height: 10rem;
+      position: relative;
+      width: 100%;
+    }
+    #comprovante.hidden {
+      display: none;
+    }
+    #print-btn {
+      margin-top: 1rem;
+      background-color: #10b981;
+      width: auto;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border-radius: 0.5rem;
+      border: none;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #print-btn:hover {
+      background-color: #059669;
+    }
+    /* Tela inicial */
+    #tela-inicial {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      width: 100%;
+      text-align: center;
+    }
+    #tela-inicial h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #2c3e50;
+      margin-bottom: 1rem;
+    }
+    #tela-inicial p {
+      font-size: 1.125rem;
+      color: #4b5563;
+      margin-bottom: 2rem;
+      max-width: 320px;
+    }
+    /* Tela pagamento */
+    #form-pagamento {
+      width: 100%;
+      display: none;
+      flex-direction: column;
+    }
+    #form-pagamento.active {
+      display: flex;
+    }
+    /* Tela processando */
+    #processando {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      width: 100%;
+      text-align: center;
+      color: #4f46e5;
+      font-weight: 700;
+      font-size: 1.25rem;
+    }
+    #processando.active {
+      display: flex;
+    }
+    /* Animação spinner */
+    .spinner {
+      border: 4px solid #cbd5e1;
+      border-top: 4px solid #4f46e5;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
+  </style>
+</head>
+<body>
+  <main role="main" aria-labelledby="page-title">
+    <!-- Tela inicial -->
+    <section id="tela-inicial" aria-label="Tela inicial do sistema de self checkout">
+      <h1 id="page-title">Bem-vindo ao Self Checkout</h1>
+      <p>Para iniciar, clique no botão abaixo para começar o pagamento via maquineta.</p>
+      <button id="btn-iniciar" type="button" aria-describedby="desc-iniciar">Iniciar Pagamento</button>
+      <p id="desc-iniciar" class="sr-only">Clique para abrir o formulário de pagamento</p>
+    </section>
+
+    <!-- Tela formulário pagamento -->
+    <section id="form-pagamento" aria-label="Formulário de pagamento via maquineta" aria-hidden="true">
+      <h2 class="text-2xl font-semibold mb-6 text-center">Digite o valor do produto</h2>
+      <form id="checkout-form" novalidate aria-describedby="form-error" class="space-y-4">
+        <div>
+          <label for="valor">Valor (R$):</label>
+          <input
+            type="number"
+            id="valor"
+            name="valor"
+            step="0.01"
+            min="0"
+            placeholder="Ex: 10.50"
+            aria-required="true"
+            aria-invalid="false"
+            aria-describedby="valor-error"
+            required
+          />
+          <p id="valor-error" class="text-red-600 mt-1 text-sm hidden" role="alert"></p>
+        </div>
+        <button type="submit" id="submit-btn" disabled>Finalizar Compra</button>
+      </form>
+    </section>
+
+    <!-- Tela processando pagamento -->
+    <section id="processando" aria-live="polite" aria-atomic="true" aria-label="Processando pagamento" aria-hidden="true">
+      <div class="spinner" role="img" aria-label="Ícone de carregamento"></div>
+      <p>Processando pagamento na maquineta...</p>
+    </section>
+
+    <!-- Comprovante -->
+    <section id="comprovante" class="hidden" aria-live="polite" aria-atomic="true" tabindex="0" aria-label="Comprovante de compra">
+      <h2 class="text-xl font-semibold mb-3 text-center">Comprovante</h2>
+      <pre id="receipt-content" aria-live="polite"></pre>
+      <button id="print-btn" type="button" aria-label="Imprimir comprovante">Imprimir Comprovante</button>
+    </section>
+  </main>
+
+  <script>
+    (function() {
+      const telaInicial = document.getElementById('tela-inicial');
+      const btnIniciar = document.getElementById('btn-iniciar');
+      const formPagamento = document.getElementById('form-pagamento');
+      const processando = document.getElementById('processando');
+      const comprovanteSection = document.getElementById('comprovante');
+      const receiptContent = document.getElementById('receipt-content');
+      const printBtn = document.getElementById('print-btn');
+
+      const form = document.getElementById('checkout-form');
+      const valorInput = document.getElementById('valor');
+      const submitBtn = document.getElementById('submit-btn');
+      const valorError = document.getElementById('valor-error');
+
+      // Função para mostrar uma tela e esconder as outras
+      function mostrarTela(tela) {
+        // Esconder todas
+        [telaInicial, formPagamento, processando, comprovanteSection].forEach(sec => {
+          sec.classList.add('hidden');
+          sec.setAttribute('aria-hidden', 'true');
+        });
+        // Mostrar a tela desejada
+        tela.classList.remove('hidden');
+        tela.setAttribute('aria-hidden', 'false');
+        // Focar no primeiro elemento relevante
+        if (tela === telaInicial) {
+          btnIniciar.focus();
+        } else if (tela === formPagamento) {
+          valorInput.focus();
+        } else if (tela === comprovanteSection) {
+          comprovanteSection.focus();
+        }
+      }
+
+      // Inicial: só tela inicial visível
+      mostrarTela(telaInicial);
+
+      // Botão iniciar pagamento
+      btnIniciar.addEventListener('click', () => {
+        mostrarTela(formPagamento);
+      });
+
+      // Validação do input e controle do botão
+      function validateInput() {
+        const valor = valorInput.value.trim();
+        const valorNum = parseFloat(valor);
+
+        if (valor === '') {
+          setInvalid('Por favor, insira o valor do produto.');
+          return false;
+        }
+        if (isNaN(valorNum) || valorNum < 0) {
+          setInvalid('Valor inválido. Digite um número maior ou igual a zero.');
+          return false;
+        }
+        setValid();
+        return true;
+      }
+
+      function setInvalid(message) {
+        valorInput.classList.add('invalid');
+        valorInput.setAttribute('aria-invalid', 'true');
+        valorError.textContent = message;
+        valorError.classList.remove('hidden');
+        submitBtn.disabled = true;
+      }
+
+      function setValid() {
+        valorInput.classList.remove('invalid');
+        valorInput.setAttribute('aria-invalid', 'false');
+        valorError.textContent = '';
+        valorError.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+
+      valorInput.addEventListener('input', validateInput);
+
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        if (!validateInput()) return;
+
+        // Mostrar tela processando
+        mostrarTela(processando);
+
+        // Simular envio para maquineta (3 segundos)
+        setTimeout(() => {
+          const valor = parseFloat(valorInput.value).toFixed(2);
+          const dataHora = new Date().toLocaleString('pt-BR', {
+            dateStyle: 'short',
+            timeStyle: 'short'
+          });
+
+          const comprovanteTexto = `
+==========================================
+           COMPROVANTE DE COMPRA
+==========================================
+Produto: Self Checkout Item
+Valor Unitário: R$ ${valor}
+Quantidade: 1
+------------------------------------------
+Total a pagar: R$ ${valor}
+==========================================
+Data/Hora: ${dataHora}
+
+Obrigado pela sua compra!
+          `.trim();
+
+          receiptContent.textContent = comprovanteTexto;
+          mostrarTela(comprovanteSection);
+
+          // Resetar formulário e botão
+          form.reset();
+          submitBtn.disabled = true;
+        }, 3000);
+      });
+
+      printBtn.addEventListener('click', function() {
+        // Imprimir só o comprovante
+        const printContents = comprovanteSection.innerHTML;
+        const originalContents = document.body.innerHTML;
+
+        document.body.innerHTML = printContents;
+        window.print();
+        document.body.innerHTML = originalContents;
+        window.location.reload();
+      });
+    })();
+  </script>
+</body>
+</html>
